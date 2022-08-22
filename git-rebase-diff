@@ -25,9 +25,14 @@ while test $# -gt 0; do
 	esac
 done
 
+# could be configurable w/ a CLI option, but i don't think anyone needs that?
 BRANCH="$(git branch --show-current)"
 
 REMOTE_BRANCH="$REMOTE/$BRANCH"
+
+# find what was the old version of the branch rebased onto.
+# old version = $REMOTE_BRANCH
+# this is why we expect that you did _not_ push after the rebase yet.
 OLD_BASE="$(git merge-base $BRANCH $REMOTE_BRANCH)"
 
 NEW_BASE="$REMOTE/$PARENT_BRANCH"

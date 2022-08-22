@@ -8,7 +8,9 @@ to make it easy to use after performing a rebase w/ merge conflicts.
 usage
 -----
 
-expects you to be checked out in the branch you rebased.
+expects that you:
+- are checked out in the branch you rebased.
+- have *not* pushed the branch to the remote yet.
 
 ```
 git-rebase-diff [-r|--remote origin] [-p|--parent-branch master]
