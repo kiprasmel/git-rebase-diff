@@ -1,0 +1,39 @@
+git-rebase-diff
+===============
+
+a tiny wrapper around git range-diff,
+to make it easy to use after performing a rebase w/ merge conflicts.
+
+
+usage
+-----
+
+expects you to be checked out in the branch you rebased.
+
+```
+git-rebase-diff [-r|--remote origin] [-p|--parent-branch master]
+```
+
+
+environment variables
+---------------------
+
+configure the defaults via:
+
+- GIT_REBASE_DIFF_DEFAULT_REMOTE
+- GIT_REBASE_DIFF_DEFAULT_PARENT
+
+
+git config
+----------
+
+respects:
+
+- init.defaultBranch
+
+
+see also
+--------
+
+- man git-range-diff
+
