@@ -6,6 +6,8 @@ DEFAULT_INIT_BRANCH="$(git config --get init.defaultBranch || printf "master")"
 REMOTE="${GIT_REBASE_DIFF_DEFAULT_REMOTE:-origin}" 
 PARENT_BRANCH="${GIT_REBASE_DIFF_DEFAULT_PARENT:-${DEFAULT_INIT_BRANCH}}"
 
+DEBUG=0
+
 while test $# -gt 0; do
 	case $1 in
 	-r|--remote)
@@ -17,6 +19,10 @@ while test $# -gt 0; do
 		shift
 		PARENT_BRANCH="$1"
 		shift
+		;;
+	-d|--debug)
+			shift
+			DEBUG=1
 		;;
 	*)
 		>&2 printf "\nunknown option $1\n\n"
@@ -42,6 +48,10 @@ NEW_BASE="$REMOTE/$PARENT_BRANCH"
 
 RANGE1="${OLD_BASE}..${REMOTE_BRANCH}" 
 RANGE2="${NEW_BASE}..${BRANCH}"
+
+test "$DEBUG" -eq 1 && {
+	printf "range1: $RANGE1\nrange2: $RANGE2\n\n"
+}
 
 git range-diff "$RANGE1" "$RANGE2" $*
 
