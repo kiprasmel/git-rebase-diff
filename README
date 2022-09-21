@@ -13,7 +13,7 @@ expects that you:
 - have *not* pushed the branch to the remote yet.
 
 ```
-git-rebase-diff [-r|--remote origin] [-p|--parent-branch master]
+git-rebase-diff [-r|--remote origin] [-p|--parent-branch master] [-d|--debug]
 ```
 
 
