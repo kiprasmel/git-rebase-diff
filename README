@@ -2,8 +2,25 @@ git-rebase-diff
 ===============
 
 a tiny wrapper around git range-diff,
-to make it easy to use after performing a rebase w/ merge conflicts.
+to make it easy to use after performing a rebase.
 
+esp useful if encountered merge conflicts
+& want to verify that nothing screwed up.
+see also: https://github.com/kiprasmel/git-diff3c
+
+setup
+-----
+
+```
+git clone https://github.com/kiprasmel/git-rebase-diff.git
+# or:  git clone git@github.com:kiprasmel/git-rebase-diff.git
+
+cd git-rebase-diff
+
+cp git-rebase-diff /usr/local/bin/
+
+git config --global init.defaultBranch=master # or whatever branch you use as default
+```
 
 usage
 -----
@@ -13,6 +30,7 @@ expects that you:
 - have *not* pushed the branch to the remote yet.
 
 ```
+git-rebase-diff
 git-rebase-diff [-r|--remote origin] [-p|--parent-branch master] [-d|--debug]
 ```
 
@@ -39,4 +57,6 @@ see also
 
 - man git-range-diff
 - https://stackoverflow.com/a/61219652/9285308
+- https://github.com/kiprasmel/git-diff3c
+
 
