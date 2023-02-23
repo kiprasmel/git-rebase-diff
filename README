@@ -32,6 +32,7 @@ expects that you:
 ```
 git-rebase-diff
 git-rebase-diff [-r|--remote origin] [-p|--parent-branch master] [-d|--debug]
+git-rebase-diff [-r|--remote origin] [-p|--parent-branch master] [-d|--debug] -- [range-diff args]...
 ```
 
 
