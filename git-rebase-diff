@@ -24,8 +24,12 @@ while test $# -gt 0; do
 			shift
 			DEBUG=1
 		;;
+	--)
+		shift
+		break
+		;;
 	*)
-		>&2 printf "\nunknown option $1\n\n"
+		>&2 printf "unknown option $1; use -- to forward args to range-diff.\n"
 		exit 1
 		;;
 	esac
