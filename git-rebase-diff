@@ -47,15 +47,17 @@ OLD_BASE="$(git merge-base $BRANCH $REMOTE_BRANCH)"
 
 NEW_BASE="$REMOTE/$PARENT_BRANCH"
 
-#echo "comparing "${OLD_BASE}..${REMOTE_BRANCH}" "${NEW_BASE}..${BRANCH}""
-#echo "comparing "$(git rev-parse $OLD_BASE)..$(git rev-parse $REMOTE_BRANCH)" "$(git rev-parse $NEW_BASE)..$(git rev-parse $BRANCH)""
-
 RANGE1="${OLD_BASE}..${REMOTE_BRANCH}" 
 RANGE2="${NEW_BASE}..${BRANCH}"
 
-test "$DEBUG" -eq 1 && {
-	printf "range1: $RANGE1\nrange2: $RANGE2\n\n"
+test -n "$DEBUG" && {
+	echo "comparing "$RANGE1" "$RANGE2""
+	echo "comparing "$(git rev-parse $OLD_BASE)..$(git rev-parse $REMOTE_BRANCH)" "$(git rev-parse $NEW_BASE)..$(git rev-parse $BRANCH)""
+	echo "comparing "$(git rev-parse $OLD_BASE)  $(git rev-parse $REMOTE_BRANCH)" "$(git rev-parse $NEW_BASE)  $(git rev-parse $BRANCH)""
+	# echo "comparing "$(git rev-parse ${OLD_BASE}..${REMOTE_BRANCH})" "$(git rev-parse ${NEW_BASE}..${BRANCH})""
 }
 
-git range-diff "$RANGE1" "$RANGE2" $*
+test -z "$GIT_REBASE_DIFF_NOEXEC" && {
+	git range-diff "$RANGE1" "$RANGE2" $*
+}
 
