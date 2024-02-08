@@ -35,13 +35,11 @@ RANGE1="${MERGE_BASE}..${OLD_HEAD}"
 RANGE2="${MERGE_BASE}..${NEW_HEAD}"
 
 test -n "$DEBUG" && {
-	>&2 echo "comparing "$RANGE1" "$RANGE2""
-	>&2 echo "comparing "$(git rev-parse $MERGE_BASE)..$(git rev-parse $OLD_HEAD)" "$(git rev-parse $MERGE_BASE)..$(git rev-parse $NEW_HEAD)""
-	>&2 echo "comparing "$(git rev-parse $MERGE_BASE)  $(git rev-parse $OLD_HEAD)" "$(git rev-parse $MERGE_BASE)..$(git rev-parse $NEW_HEAD)""
+	>&2 echo "comparing "$MERGE_BASE" "$OLD_HEAD" "$NEW_HEAD""
 }
 
 test -z "$GIT_REBASE_DIFF_NOEXEC" && {
-	git range-diff "$RANGE1" "$RANGE2" $*
+	git range-diff $MERGE_BASE $OLD_HEAD $NEW_HEAD
 }
 
 test "$SHOWING_PREVIOUS" -eq 1 && {
