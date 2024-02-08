@@ -36,6 +36,16 @@ main() {
 			shift
 			break
 			;;
+
+		# extras for NTH
+		-max)
+			shift
+			NTH="$(get_max_entry)"
+			;;
+		-*)
+			NTH="$(printf "%s" "$1" | cut -d- -f2)"
+			shift
+			;;
 		*)
 			>&2 printf "unknown option %s; use -- to forward args to range-diff.\n" $1
 			exit 1

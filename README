@@ -9,6 +9,7 @@ esp useful if encountered merge conflicts
 & want to verify that nothing screwed up.
 see also: https://github.com/kiprasmel/git-diff3c
 
+
 setup
 -----
 
@@ -23,6 +24,7 @@ cp git-rebase-diff /usr/local/bin/
 git config --global alias.rd rebase-diff
 ```
 
+
 usage
 -----
 
@@ -35,20 +37,6 @@ git-rebase-diff
 git-rebase-diff [options]...
 git-rebase-diff -- [range-diff args]...
 ```
-
-viewing a previous rebase diff
-------------------------------
-
-git-rebase-diff --nth 0   # current (no effect)
-git-rebase-diff --nth 1   # 1st previous
-git-rebase-diff -x    5   # 5th previous
-git-rebase-diff -x    max # very last
-
-viewing an interval of grouped rebase-diffs
-viewing multiple (grouped) rebase-diffs
----------------------------------------
-
-
 
 
 behavior
@@ -63,8 +51,24 @@ base=$(git merge-base $old $new)
 git range-diff $base..$old $base..$new
 ```
 
-but if $old == $new, then nothing would show up,
-thus we show the previous range-diff by changing $old to @{u}@{1}
+
+viewing a previous rebase diff
+------------------------------
+
+git-rebase-diff --prev 0   # current (no effect)
+git-rebase-diff --prev 1   # 1st previous
+git-rebase-diff       -1   # 1st previous
+git-rebase-diff       -5   # 5th previous
+git-rebase-diff       -max # very last
+
+
+viewing an interval of grouped rebase-diffs
+viewing multiple rebase-diffs
+---------------------------------------
+
+git-rebase-diff --left 5           # from previous 5th till current
+git-rebase-diff --left 5 --right 2 # from previous 5th till previous 2nd
+
 
 see also
 --------
