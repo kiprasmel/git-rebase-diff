@@ -2,7 +2,8 @@ git-rebase-diff
 ===============
 
 a tiny wrapper around git range-diff,
-to make it easy to use after performing a rebase.
+to make it easy to use after performing a rebase
+(or multiple rebases, as long as you haven't pushed to a remote branch yet).
 
 esp useful if encountered merge conflicts
 & want to verify that nothing screwed up.
@@ -16,42 +17,38 @@ git clone https://github.com/kiprasmel/git-rebase-diff.git
 # or:  git clone git@github.com:kiprasmel/git-rebase-diff.git
 
 cd git-rebase-diff
-
 cp git-rebase-diff /usr/local/bin/
 
-git config --global init.defaultBranch=master # or whatever branch you use as default
+# optional alias
+git config --global alias.rd rebase-diff
 ```
 
 usage
 -----
 
 expects that you:
-- are checked out in the branch you rebased.
-- have *not* pushed the branch to the remote yet.
+- are checked out in the branch you rebased
+	- the branch has a remote counterpart
 
 ```
 git-rebase-diff
-git-rebase-diff [-r|--remote origin] [-p|--parent-branch master] [-d|--debug]
-git-rebase-diff [-r|--remote origin] [-p|--parent-branch master] [-d|--debug] -- [range-diff args]...
+git-rebase-diff -- [range-diff args]...
 ```
 
+behavior
+--------
 
-environment variables
----------------------
+essentially does:
 
-configure the defaults via:
+```
+old=@{u}
+new=@
+base=$(git merge-base $old $new)
+git range-diff $base..$old $base..$new
+```
 
-- GIT_REBASE_DIFF_DEFAULT_REMOTE
-- GIT_REBASE_DIFF_DEFAULT_PARENT
-
-
-git config
-----------
-
-respects:
-
-- init.defaultBranch
-
+but if $old == $new, then nothing would show up,
+thus we show the previous range-diff by changing $old to @{u}@{1}
 
 see also
 --------
@@ -59,5 +56,4 @@ see also
 - man git-range-diff
 - https://stackoverflow.com/a/61219652/9285308
 - https://github.com/kiprasmel/git-diff3c
-
 
