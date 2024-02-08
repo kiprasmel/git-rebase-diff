@@ -32,8 +32,24 @@ expects that you:
 
 ```
 git-rebase-diff
+git-rebase-diff [options]...
 git-rebase-diff -- [range-diff args]...
 ```
+
+viewing a previous rebase diff
+------------------------------
+
+git-rebase-diff --nth 0   # current (no effect)
+git-rebase-diff --nth 1   # 1st previous
+git-rebase-diff -x    5   # 5th previous
+git-rebase-diff -x    max # very last
+
+viewing an interval of grouped rebase-diffs
+viewing multiple (grouped) rebase-diffs
+---------------------------------------
+
+
+
 
 behavior
 --------

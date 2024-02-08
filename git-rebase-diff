@@ -1,48 +1,129 @@
 #!/bin/sh
 
-while test $# -gt 0; do
-	case $1 in
-	-d|--debug)
+set -e
+
+main() {
+	NTH=0
+	LEFT=0
+	RIGHT=0
+	GIT_REBASE_DIFF_NOEXEC=${GIT_REBASE_DIFF_NOEXEC:-0}
+
+	while test $# -gt 0; do
+		case $1 in
+		-x|--nth)
+			shift
+			NTH="$1"
+			shift
+			test "$NTH" == "max" && NTH="$(get_max_entry)"
+			;;
+		-l|--left)
+			shift
+			LEFT="$1"
+			shift
+			test "$LEFT" == "max" && LEFT="$(get_max_entry)"
+			;;
+		-r|--right)
+			shift
+			RIGHT="$1"
+			shift
+			;;
+
+		-d|--debug)
 			shift
 			DEBUG=1
-		;;
-	--)
-		shift
-		break
-		;;
-	*)
-		>&2 printf "unknown option $1; use -- to forward args to range-diff.\n"
-		exit 1
-		;;
-	esac
-done
+			;;
+		--)
+			shift
+			break
+			;;
+		*)
+			>&2 printf "unknown option %s; use -- to forward args to range-diff.\n" $1
+			exit 1
+			;;
+		esac
+	done
 
-OLD_HEAD="@{u}"
-NEW_HEAD="@"
+	test $NTH -ne 0 && {
+		BAD=0
+		test $LEFT  -ne 0 && BAD=1
+		test $RIGHT -ne 0 && BAD=1
 
-SHOWING_PREVIOUS=0
+		test $BAD -ne 0 && {
+			>&2 printf "option --nth cannot be used with --left, --right.\n"
+			exit 1
+		}
 
-if [ "$(git rev-parse "$OLD_HEAD")" == "$(git rev-parse "$NEW_HEAD")" ]; then
-	# OLD_HEAD == NEW_HEAD, thus nothing will be different.
-	# thus, instead, show the previous range diff.
-	SHOWING_PREVIOUS=1
-	OLD_HEAD="@{u}@{1}"
-fi
+		LEFT=$NTH
+		RIGHT=$NTH
+	}
 
-MERGE_BASE="$(git merge-base "$OLD_HEAD" "$NEW_HEAD")"
+	COUNT=$(( LEFT - RIGHT + 1 ))
 
-RANGE1="${MERGE_BASE}..${OLD_HEAD}" 
-RANGE2="${MERGE_BASE}..${NEW_HEAD}"
+	nth=$LEFT
+	while test $nth -ge $RIGHT; do
+		git_rebase_diff $nth $COUNT
+		nth=$(( nth - 1 ))
+	done
 
-test -n "$DEBUG" && {
-	>&2 echo "comparing "$MERGE_BASE" "$OLD_HEAD" "$NEW_HEAD""
+	exit 0
 }
 
-test -z "$GIT_REBASE_DIFF_NOEXEC" && {
-	git range-diff $MERGE_BASE $OLD_HEAD $NEW_HEAD
+git_rebase_diff() {
+	nth=$1
+	shift
+	count=$1
+	shift
+
+	OLD_HEAD="@{u}@{$nth}"
+	NEW_HEAD="@{u}@{$(( nth - 1 ))}"
+	test $nth -eq 0 && {
+		NEW_HEAD="@"
+	}
+
+	rOLD="$(git rev-parse $OLD_HEAD 2>&1)" || {
+		# log does not have as many entries. re-print the error:
+		>&2 printf "%s\n" "$rOLD"
+		return 1
+	}
+	rNEW=$(git rev-parse "$NEW_HEAD")
+
+	OLD_HEAD_EQUALS_NEW_HEAD=0
+	test "$rOLD" == "$rNEW" && OLD_HEAD_EQUALS_NEW_HEAD=1
+
+	#rOLD="$(git rev-parse "$OLD_HEAD")"
+	#rNEW="$(git rev-parse "$NEW_HEAD")"
+	#test $rOLD == $rNEW && OLD_HEAD_EQUALS_NEW_HEAD=1
+
+	MERGE_BASE="$(git merge-base "$OLD_HEAD" "$NEW_HEAD")"
+
+	#RANGE1="${MERGE_BASE}..${OLD_HEAD}" 
+	#RANGE2="${MERGE_BASE}..${NEW_HEAD}"
+
+	test -n "$DEBUG" || test $count -gt 1 && {
+		>&2 printf "comparing %s %s %s (%s %s):\n" \
+			"$MERGE_BASE" "$OLD_HEAD" "$NEW_HEAD" "$(git rev-parse ${OLD_HEAD})" "$(git rev-parse ${NEW_HEAD})"
+	}
+
+
+	if test "$OLD_HEAD_EQUALS_NEW_HEAD" -eq 1; then
+		extra=""
+		test $count -eq 1 && extra=". try:\ngit-rebase-diff -x,--nth <number>"
+		>&2 printf "\$old == \$new, nothing to do${extra}\n"
+	fi
+
+	test "$GIT_REBASE_DIFF_NOEXEC" -eq 0 && {
+		git range-diff $MERGE_BASE $OLD_HEAD $NEW_HEAD
+		test "$count" -gt 1 && printf "\n"
+	}
+
+	return 0
 }
 
-test "$SHOWING_PREVIOUS" -eq 1 && {
-	>&2 printf "\nold == new, thus showing previous rebase-diff instead.\n"
+get_max_entry() {
+	MAX_ENTRY="$(git rev-parse "@{u}@{1234567}" 2>&1 | sed -E "s/fatal: log for '[^']+' only has ([0-9]+) entries/\1/")"
+	MAX_ENTRY=$(( MAX_ENTRY - 1 ))
+	printf "$MAX_ENTRY"
 }
+
+main $*
 
