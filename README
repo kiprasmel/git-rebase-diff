@@ -59,3 +59,20 @@ see also
 - man git-range-diff
 - https://github.com/kiprasmel/git-diff3c
 
+---
+
+update
+------
+
+i've been experimenting with revision syntax.
+there's some work in the `experiment' branch; not ready yet.
+in the meantime, one can try:
+
+- git range-diff @{1}...
+  - to get the range diff of HEAD vs last version of HEAD
+  - use `@{n}' to get HEAD vs `n'th-previous version of HEAD
+
+- git range-diff @{u}...
+  - to get the range diff of HEAD vs remote HEAD
+  - use `@{u}@{n}' to get HEAD vs `n'th-previous version of remote HEAD
+
