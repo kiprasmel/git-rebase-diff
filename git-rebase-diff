@@ -2,6 +2,14 @@
 
 set -e
 
+# TODO:
+#
+# 1. --left max should become default behavior
+# except that we list only the versions of this branch, and it's summaries (1 line per version/reroll)
+#
+#
+#
+
 main() {
 	NTH=0
 	LEFT=0
@@ -136,4 +144,3 @@ get_max_entry() {
 }
 
 main $*
-
