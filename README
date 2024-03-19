@@ -70,6 +70,12 @@ git-rebase-diff --left 5           # from previous 5th till current
 git-rebase-diff --left 5 --right 2 # from previous 5th till previous 2nd
 
 
+known issues
+------------
+
+won't work if you rebased starting from the initial commit (via --root)
+
+
 see also
 --------
 
