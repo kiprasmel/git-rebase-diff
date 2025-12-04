@@ -139,7 +139,12 @@ git_rebase_diff() {
 
 	test "$GIT_REBASE_DIFF_NOEXEC" -eq 0 && {
 		if test "$aggregate" -eq 1; then
-			PAGER_CMD=$(get_pager)
+			# Use simple pager for aggregate (diff-so-fancy breaks our output)
+			PAGER_CMD=$(get_simple_pager)
+			# Check color before piping (pipe loses TTY detection)
+			USE_COLOR=0
+			should_use_color && USE_COLOR=1
+			export USE_COLOR
 			git_rebase_diff_aggregate "$MERGE_BASE" "$OLD_HEAD" "$NEW_HEAD" | $PAGER_CMD
 		else
 			git range-diff "$MERGE_BASE" "$OLD_HEAD" "$NEW_HEAD" "$@"
@@ -175,6 +180,9 @@ git_rebase_diff_aggregate() {
 	files=$(git diff --name-only "$old_base" "$old_head")
 	found_diff=0
 
+	# Use color from parent (checked before pipe)
+	use_color=${USE_COLOR:-0}
+
 	for f in $files; do
 		# Compare only ADDED lines (^+), not removed lines (^-)
 		# because the base content differs between old and new
@@ -183,17 +191,142 @@ git_rebase_diff_aggregate() {
 
 		if test "$old_adds" != "$new_adds"; then
 			found_diff=1
-			printf "=== %s ===\n" "$f"
 			git diff "$old_base" "$old_head" -- "$f" > "$OLD_PATCH"
 			git diff "$new_base" "$new_head" -- "$f" > "$NEW_PATCH"
-			diff -u "$OLD_PATCH" "$NEW_PATCH" || true
-			printf "\n"
+			# Filter noise first, then colorize
+			clean_diff=$(diff -u "$OLD_PATCH" "$NEW_PATCH" 2>/dev/null | filter_aggregate_diff "$f" "$use_color" || true)
+			test -n "$clean_diff" && printf "%s\n\n" "$clean_diff"
 		fi
 	done
 
 	test "$found_diff" -eq 0 && {
 		>&2 printf "no differences found - rebase was clean.\n"
 	}
+}
+
+# Filter diff-of-diffs output to show only meaningful content
+# Args: $1 = filename, $2 = use_color (1 or 0)
+filter_aggregate_diff() {
+	filename=$1
+	use_color=${2:-0}
+	awk -v fname="$filename" -v color="$use_color" '
+	BEGIN {
+		header_printed = 0
+		pending_hunk = ""
+		CTX = 1  # Context lines around changes
+		ctx_idx = 0
+		ctx_len = 0
+		after_change = 0
+		had_output = 0
+		if (color) {
+			RESET = "\033[0m"
+			BOLD = "\033[1m"
+			RED = "\033[31m"
+			GREEN = "\033[32m"
+			YELLOW = "\033[33m"
+			CYAN = "\033[36m"
+			DIM = "\033[2m"
+		} else {
+			RESET = BOLD = RED = GREEN = YELLOW = CYAN = DIM = ""
+		}
+	}
+	
+	# Skip outer diff headers
+	/^--- \// { next }
+	/^\+\+\+ \// { next }
+	/^@@ .* @@$/ { next }
+	
+	# Skip inner diff metadata
+	/^[-+ ]?diff --git / { next }
+	/^[-+ ]?index [0-9a-f]/ { next }
+	/^[-+ ]?--- a\// { next }
+	/^[-+ ]?\+\+\+ b\// { next }
+	
+	# Handle @@ hunk headers
+	/^[-+ ]?@@ / {
+		line = $0
+		line_num = ""
+		while (match(line, /\+[0-9]+/)) {
+			line_num = substr(line, RSTART+1, RLENGTH-1)
+			line = substr(line, RSTART + RLENGTH)
+		}
+		if (line_num != "") pending_hunk = line_num
+		ctx_idx = 0
+		ctx_len = 0
+		after_change = 0
+		next
+	}
+	
+	function flush_hunk() {
+		if (pending_hunk == "") return
+		if (!header_printed) {
+			printf "%s%s=== %s:%s ===%s\n", BOLD, YELLOW, fname, pending_hunk, RESET
+			header_printed = 1
+		} else if (had_output) {
+			printf "%s...%s\n", DIM, RESET
+		}
+		pending_hunk = ""
+	}
+	
+	function flush_context() {
+		if (ctx_len == 0) return
+		start = ctx_len <= CTX ? 0 : ctx_len - CTX
+		for (i = start; i < ctx_len; i++) {
+			idx = (ctx_idx - ctx_len + i + CTX * 2) % (CTX * 2)
+			if (idx < 0) idx += CTX * 2
+			printf "%s%s%s\n", DIM, ctx_ring[idx], RESET
+		}
+		ctx_len = 0
+		ctx_idx = 0
+	}
+	
+	# REAL changes: outer +/- AND inner +/- (double operators)
+	# These are actual code changes between rebases
+	/^(\+\+|\+\-|\-\+|\-\-)/ {
+		flush_hunk()
+		flush_context()
+		after_change = CTX
+		had_output = 1
+		if (substr($0, 1, 1) == "-") {
+			printf "%s%s%s\n", RED, $0, RESET
+		} else {
+			printf "%s%s%s\n", GREEN, $0, RESET
+		}
+		next
+	}
+	
+	# Hunk boundary changes (outer +/- but inner context): skip
+	/^[-+] / { next }
+	
+	# Inner diff context that didnt change ( + or  - or   )
+	# Only keep as minimal context around real changes
+	{
+		if (after_change > 0) {
+			flush_hunk()
+			# Only show inner +/- context, skip pure whitespace context
+			if (/^ [-+]/) {
+				printf "%s%s%s\n", DIM, $0, RESET
+				had_output = 1
+			}
+			after_change--
+			next
+		}
+		# Buffer context (only inner +/- lines, not pure context)
+		if (/^ [-+]/) {
+			ctx_ring[ctx_idx] = $0
+			ctx_idx = (ctx_idx + 1) % (CTX * 2)
+			if (ctx_len < CTX * 2) ctx_len++
+		}
+	}
+	'
+}
+
+# Check if we should use color output
+should_use_color() {
+	test -t 1 || return 1
+	test -n "$NO_COLOR" && return 1
+	test "$TERM" = "dumb" && return 1
+	return 0
 }
 
 get_pager() {
@@ -206,6 +339,20 @@ get_pager() {
 	else
 		printf "cat"
 	fi
+}
+
+# Simple pager that doesn't mangle diff output (no diff-so-fancy)
+get_simple_pager() {
+	# Check if stdout is a terminal
+	test -t 1 || { printf "cat"; return; }
+	
+	# Use less with color support if available
+	command -v less >/dev/null 2>&1 && {
+		printf "less -RFX"
+		return
+	}
+	
+	printf "cat"
 }
 
 get_max_entry() {
