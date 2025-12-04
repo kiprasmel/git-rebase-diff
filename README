@@ -70,6 +70,18 @@ git-rebase-diff --left 5           # from previous 5th till current
 git-rebase-diff --left 5 --right 2 # from previous 5th till previous 2nd
 
 
+aggregate diff (semantic comparison)
+------------------------------------
+
+shows only actual content changes in what your branch contributes,
+ignoring context/line-number shifts from upstream changes.
+
+useful to verify conflict resolutions didn't accidentally change your work.
+
+git-rebase-diff -a
+
+
+
 known issues
 ------------
 
@@ -82,4 +94,3 @@ see also
 - man git-range-diff
 - https://stackoverflow.com/a/61219652/9285308
 - https://github.com/kiprasmel/git-diff3c
-

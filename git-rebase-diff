@@ -14,6 +14,7 @@ main() {
 	NTH=0
 	LEFT=0
 	RIGHT=0
+	AGGREGATE=0
 	GIT_REBASE_DIFF_NOEXEC=${GIT_REBASE_DIFF_NOEXEC:-0}
 
 	while test $# -gt 0; do
@@ -34,6 +35,11 @@ main() {
 			shift
 			RIGHT="$1"
 			shift
+			;;
+
+		-a|--aggregate|--final)
+			shift
+			AGGREGATE=1
 			;;
 
 		-d|--debug)
@@ -79,7 +85,7 @@ main() {
 
 	nth=$LEFT
 	while test $nth -ge $RIGHT; do
-		git_rebase_diff $nth $COUNT
+		git_rebase_diff $nth $COUNT $AGGREGATE
 		nth=$(( nth - 1 ))
 	done
 
@@ -90,6 +96,8 @@ git_rebase_diff() {
 	nth=$1
 	shift
 	count=$1
+	shift
+	aggregate=$1
 	shift
 
 	OLD_HEAD="@{u}@{$nth}"
@@ -130,11 +138,74 @@ git_rebase_diff() {
 	fi
 
 	test "$GIT_REBASE_DIFF_NOEXEC" -eq 0 && {
-		git range-diff $MERGE_BASE $OLD_HEAD $NEW_HEAD
+		if test "$aggregate" -eq 1; then
+			PAGER_CMD=$(get_pager)
+			git_rebase_diff_aggregate "$MERGE_BASE" "$OLD_HEAD" "$NEW_HEAD" | $PAGER_CMD
+		else
+			git range-diff "$MERGE_BASE" "$OLD_HEAD" "$NEW_HEAD" "$@"
+		fi
 		test "$count" -gt 1 && printf "\n"
 	}
 
 	return 0
+}
+
+git_rebase_diff_aggregate() {
+	old_base=$1
+	old_head=$2
+	new_head=$3
+	
+	# Find NEW_BASE: parent of first commit in new_head that's not in old_head
+	# This works even if commit count changed (squash/split/etc)
+	first_rebased=$(git rev-list "$old_head".."$new_head" | tail -1)
+	new_base=$(git rev-parse "$first_rebased^")
+
+	test -n "$DEBUG" && {
+		old_count=$(git rev-list --count "$old_base".."$old_head")
+		new_count=$(git rev-list --count "$new_base".."$new_head")
+		>&2 printf "aggregate: OLD_BASE=%s NEW_BASE=%s (old_commits=%s new_commits=%s)\n" \
+			"$old_base" "$new_base" "$old_count" "$new_count"
+	}
+
+	TMPDIR="${TMPDIR:-/tmp}"
+	OLD_PATCH="$TMPDIR/git-rebase-diff-old.$$"
+	NEW_PATCH="$TMPDIR/git-rebase-diff-new.$$"
+	trap "rm -f '$OLD_PATCH' '$NEW_PATCH'" EXIT
+
+	files=$(git diff --name-only "$old_base" "$old_head")
+	found_diff=0
+
+	for f in $files; do
+		# Compare only ADDED lines (^+), not removed lines (^-)
+		# because the base content differs between old and new
+		old_adds=$(git diff "$old_base" "$old_head" -- "$f" 2>/dev/null | grep "^+" | grep -v "^+++" | sort)
+		new_adds=$(git diff "$new_base" "$new_head" -- "$f" 2>/dev/null | grep "^+" | grep -v "^+++" | sort)
+
+		if test "$old_adds" != "$new_adds"; then
+			found_diff=1
+			printf "=== %s ===\n" "$f"
+			git diff "$old_base" "$old_head" -- "$f" > "$OLD_PATCH"
+			git diff "$new_base" "$new_head" -- "$f" > "$NEW_PATCH"
+			diff -u "$OLD_PATCH" "$NEW_PATCH" || true
+			printf "\n"
+		fi
+	done
+
+	test "$found_diff" -eq 0 && {
+		>&2 printf "no differences found - rebase was clean.\n"
+	}
+}
+
+get_pager() {
+	if test -n "$GIT_PAGER"; then
+		printf "%s" "$GIT_PAGER"
+	elif git config core.pager >/dev/null 2>&1; then
+		git config core.pager
+	elif test -n "$PAGER"; then
+		printf "%s" "$PAGER"
+	else
+		printf "cat"
+	fi
 }
 
 get_max_entry() {
