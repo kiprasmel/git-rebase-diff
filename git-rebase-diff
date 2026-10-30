@@ -90,7 +90,7 @@ main() {
 
 	nth=$LEFT
 	while test $nth -ge $RIGHT; do
-		git_rebase_diff $nth $COUNT "$MODE"
+		git_rebase_diff $nth $COUNT "$MODE" "$@"
 		nth=$(( nth - 1 ))
 	done
 
@@ -168,10 +168,8 @@ git_rebase_diff_aggregate() {
 	old_head=$2
 	new_head=$3
 	
-	# Find NEW_BASE: parent of first commit in new_head that's not in old_head
-	# This works even if commit count changed (squash/split/etc)
-	first_rebased=$(git rev-list "$old_head".."$new_head" | tail -1)
-	new_base=$(git rev-parse "$first_rebased^")
+	# Find NEW_BASE: use the most appropriate base for the new head
+	new_base=$(get_new_base "$new_head" "$old_head")
 
 	test -n "$DEBUG" && {
 		old_count=$(git rev-list --count "$old_base".."$old_head")
@@ -219,9 +217,8 @@ git_rebase_diff_absolute() {
 	old_head=$2
 	new_head=$3
 	
-	# Find NEW_BASE: parent of first commit in new_head that's not in old_head
-	first_rebased=$(git rev-list "$old_head".."$new_head" | tail -1)
-	new_base=$(git rev-parse "$first_rebased^")
+	# Find NEW_BASE: use the most appropriate base for the new head
+	new_base=$(get_new_base "$new_head" "$old_head")
 
 	test -n "$DEBUG" && {
 		>&2 printf "absolute: OLD_BASE=%s NEW_BASE=%s\n" "$old_base" "$new_base"
@@ -334,13 +331,21 @@ filter_aggregate_diff() {
 	}
 	
 	# REAL changes: outer +/- AND inner +/- (double operators)
-	# These are actual code changes between rebases
+	# Color based on effective action (same logic as absolute mode)
 	/^(\+\+|\+\-|\-\+|\-\-)/ {
 		flush_hunk()
 		flush_context()
 		after_change = CTX
 		had_output = 1
-		if (substr($0, 1, 1) == "-") {
+		outer = substr($0, 1, 1)
+		inner = substr($0, 2, 1)
+		# Effective operator: outer + = use inner; outer - = flip inner
+		if (outer == "+") {
+			op = inner
+		} else {
+			op = (inner == "+") ? "-" : "+"
+		}
+		if (op == "-") {
 			printf "%s%s%s\n", RED, $0, RESET
 		} else {
 			printf "%s%s%s\n", GREEN, $0, RESET
@@ -536,6 +541,55 @@ get_simple_pager() {
 	}
 	
 	printf "cat"
+}
+
+# Get the new base for comparing patches after rebase
+# Tries multiple strategies and uses the most recent (best) base
+get_new_base() {
+	head_ref=$1
+	old_head=$2  # Optional: the old head to compare against
+	
+	# Strategy 1: parent of first rebased commit (original approach)
+	if test -n "$old_head"; then
+		first_rebased=$(git rev-list "$old_head".."$head_ref" 2>/dev/null | tail -1)
+		if test -n "$first_rebased"; then
+			base1=$(git rev-parse "$first_rebased^" 2>/dev/null)
+		fi
+	fi
+	
+	# Strategy 2: merge-base with main/master
+	main_branch=""
+	if git rev-parse --verify main >/dev/null 2>&1; then
+		main_branch="main"
+	elif git rev-parse --verify master >/dev/null 2>&1; then
+		main_branch="master"
+	elif git rev-parse --verify origin/main >/dev/null 2>&1; then
+		main_branch="origin/main"
+	elif git rev-parse --verify origin/master >/dev/null 2>&1; then
+		main_branch="origin/master"
+	fi
+	
+	if test -n "$main_branch"; then
+		base2=$(git merge-base "$head_ref" "$main_branch" 2>/dev/null)
+	fi
+	
+	# Use the MORE RECENT base (the one that's an ancestor of the other, or equal)
+	# This handles both scenarios correctly
+	if test -n "$base1" && test -n "$base2"; then
+		# Check if base2 is ancestor of base1 (base2 is older)
+		if git merge-base --is-ancestor "$base2" "$base1" 2>/dev/null; then
+			printf "%s" "$base1"
+		else
+			printf "%s" "$base2"
+		fi
+	elif test -n "$base2"; then
+		printf "%s" "$base2"
+	elif test -n "$base1"; then
+		printf "%s" "$base1"
+	else
+		# Last resort fallback
+		git merge-base "$head_ref" "@{u}" 2>/dev/null || git rev-parse "$head_ref^"
+	fi
 }
 
 get_max_entry() {
